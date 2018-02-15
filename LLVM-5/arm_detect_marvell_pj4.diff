@@ -1,12 +1,12 @@
 diff --git a/include/llvm/Support/ARMTargetParser.def b/include/llvm/Support/ARMTargetParser.def
-index 65cb271..2b04918 100644
+index 65cb271..33365d2 100644
 --- a/include/llvm/Support/ARMTargetParser.def
 +++ b/include/llvm/Support/ARMTargetParser.def
 @@ -219,6 +219,8 @@ ARM_CPU_NAME("cortex-a17", AK_ARMV7A, FK_NEON_VFPV4, false,
                ARM::AEK_HWDIVTHUMB))
  ARM_CPU_NAME("krait", AK_ARMV7A, FK_NEON_VFPV4, false,
               (ARM::AEK_HWDIVARM | ARM::AEK_HWDIVTHUMB))
-+ARM_CPU_NAME("marvell-pj4", AK_ARMV7A, FK_VFPV3,
++ARM_CPU_NAME("marvell-pj4", AK_ARMV7A, FK_VFPV3, false,
 +             (ARM::AEK_HWDIVARM | ARM::AEK_HWDIVTHUMB))
  ARM_CPU_NAME("cortex-r4", AK_ARMV7R, FK_NONE, true, ARM::AEK_NONE)
  ARM_CPU_NAME("cortex-r4f", AK_ARMV7R, FK_VFPV3_D16, false, ARM::AEK_NONE)
