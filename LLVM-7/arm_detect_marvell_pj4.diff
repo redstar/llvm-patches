@@ -1,31 +1,25 @@
 diff --git a/include/llvm/Support/ARMTargetParser.def b/include/llvm/Support/ARMTargetParser.def
-index 6c8eff1..bc8dca1 100644
+index 6c8eff1..e7c53e5 100644
 --- a/include/llvm/Support/ARMTargetParser.def
 +++ b/include/llvm/Support/ARMTargetParser.def
-@@ -224,6 +224,8 @@ ARM_CPU_NAME("cortex-a17", ARMV7A, FK_NEON_VFPV4, false,
-               ARM::AEK_HWDIVTHUMB))
- ARM_CPU_NAME("krait", ARMV7A, FK_NEON_VFPV4, false,
+@@ -259,6 +259,8 @@ ARM_CPU_NAME("iwmmxt", IWMMXT, FK_NONE, true, ARM::AEK_NONE)
+ ARM_CPU_NAME("xscale", XSCALE, FK_NONE, true, ARM::AEK_NONE)
+ ARM_CPU_NAME("swift", ARMV7S, FK_NEON_VFPV4, true,
               (ARM::AEK_HWDIVARM | ARM::AEK_HWDIVTHUMB))
 +ARM_CPU_NAME("marvell-pj4", ARMV7A, FK_VFPV3, false,
-+             (ARM::AEK_HWDIVARM | ARM::AEK_HWDIVTHUMB))
- ARM_CPU_NAME("cortex-r4", ARMV7R, FK_NONE, true, ARM::AEK_NONE)
- ARM_CPU_NAME("cortex-r4f", ARMV7R, FK_VFPV3_D16, false, ARM::AEK_NONE)
- ARM_CPU_NAME("cortex-r5", ARMV7R, FK_VFPV3_D16, false,
++             (ARM::AEK_DSP | ARM::AEK_HWDIVTHUMB | ARM::AEK_IWMMXT2))
+ // Invalid CPU
+ ARM_CPU_NAME("invalid", INVALID, FK_INVALID, true, ARM::AEK_INVALID)
+ #undef ARM_CPU_NAME
 diff --git a/lib/Support/Host.cpp b/lib/Support/Host.cpp
-index 695683e..83f6ccb 100644
+index 7945aa5..f45cee0 100644
 --- a/lib/Support/Host.cpp
 +++ b/lib/Support/Host.cpp
-@@ -247,6 +247,25 @@ StringRef sys::detail::getHostCPUNameForARM(
+@@ -247,6 +247,19 @@ StringRef sys::detail::getHostCPUNameForARM(
      }
    }
  
 +  if (Implementer == "0x56") { // Marvell Technology Group Ltd.
-+    // Look for the CPU architecture line.
-+    for (unsigned I = 0, E = Lines.size(); I != E; ++I)
-+      if (Lines[I].startswith("CPU architecture"))
-+        // Architecture must be ARMv7.
-+        if (Lines[I].substr(16).ltrim("\t :") != "7")
-+          return "generic";
 +    // Look for the CPU part line.
 +    for (unsigned I = 0, E = Lines.size(); I != E; ++I)
 +      if (Lines[I].startswith("CPU part"))
@@ -42,44 +36,33 @@ index 695683e..83f6ccb 100644
  }
  
 diff --git a/unittests/Support/Host.cpp b/unittests/Support/Host.cpp
-index 736b04c..78fe863 100644
+index 736b04c..12d7df0 100644
 --- a/unittests/Support/Host.cpp
 +++ b/unittests/Support/Host.cpp
-@@ -92,6 +92,18 @@ Serial          : 0000000000000000
+@@ -92,6 +92,12 @@ Serial          : 0000000000000000
    EXPECT_EQ(sys::detail::getHostCPUNameForARM("CPU implementer : 0x51\n"
                                                "CPU part        : 0x06f"),
              "krait");
 +  EXPECT_EQ(sys::detail::getHostCPUNameForARM("CPU implementer : 0x56\n"
-+                                              "CPU architecture: 7\n"
 +                                              "CPU part        : 0x581"),
 +            "marvell-pj4");
 +  EXPECT_EQ(sys::detail::getHostCPUNameForARM("CPU implementer : 0x56\n"
-+                                              "CPU architecture: 7\n"
 +                                              "CPU part        : 0x584"),
 +            "marvell-pj4");
-+  EXPECT_EQ(sys::detail::getHostCPUNameForARM("CPU implementer : 0x56\n"
-+                                              "CPU architecture: 6\n"
-+                                              "CPU part        : 0x584"),
-+            "generic");
  }
  
  TEST(getLinuxHostCPUName, AArch64) {
 diff --git a/unittests/Support/TargetParserTest.cpp b/unittests/Support/TargetParserTest.cpp
-index f636ca2..473a0cc 100644
+index f636ca2..abcdbf4 100644
 --- a/unittests/Support/TargetParserTest.cpp
 +++ b/unittests/Support/TargetParserTest.cpp
-@@ -175,6 +175,9 @@ TEST(TargetParserTest, testARMCPU) {
-   EXPECT_TRUE(testARMCPU("krait", "armv7-a", "neon-vfpv4",
+@@ -277,9 +277,12 @@ TEST(TargetParserTest, testARMCPU) {
+   EXPECT_TRUE(testARMCPU("swift", "armv7s", "neon-vfpv4",
                           ARM::AEK_HWDIVARM | ARM::AEK_HWDIVTHUMB | ARM::AEK_DSP,
-                          "7-A"));
-+  EXPECT_TRUE(testARMCPU("marvell-pj4", "armv7-a", "vfpv3",
-+                         ARM::AEK_HWDIVARM | ARM::AEK_HWDIVTHUMB | ARM::AEK_DSP,
-+                         "7-A"));
-   EXPECT_TRUE(testARMCPU("cortex-r4", "armv7-r", "none",
-                          ARM::AEK_HWDIVTHUMB | ARM::AEK_DSP, "7-R"));
-   EXPECT_TRUE(testARMCPU("cortex-r4f", "armv7-r", "vfpv3-d16",
-@@ -279,7 +282,7 @@ TEST(TargetParserTest, testARMCPU) {
                           "7-S"));
++  EXPECT_TRUE(testARMCPU("marvell-pj4", "armv7-a", "vfpv3",
++                         ARM::AEK_DSP | ARM::AEK_IWMMXT2 | ARM::AEK_HWDIVTHUMB,
++                         "7-A"));
  }
  
 -static constexpr unsigned NumARMCPUArchs = 82;
