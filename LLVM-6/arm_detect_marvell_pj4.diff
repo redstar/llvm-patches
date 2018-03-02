@@ -1,0 +1,68 @@
+diff --git a/include/llvm/Support/ARMTargetParser.def b/include/llvm/Support/ARMTargetParser.def
+index 6c8eff1..e7c53e5 100644
+--- a/include/llvm/Support/ARMTargetParser.def
++++ b/include/llvm/Support/ARMTargetParser.def
+@@ -259,6 +259,8 @@ ARM_CPU_NAME("iwmmxt", IWMMXT, FK_NONE, true, ARM::AEK_NONE)
+ ARM_CPU_NAME("xscale", XSCALE, FK_NONE, true, ARM::AEK_NONE)
+ ARM_CPU_NAME("swift", ARMV7S, FK_NEON_VFPV4, true,
+              (ARM::AEK_HWDIVARM | ARM::AEK_HWDIVTHUMB))
++ARM_CPU_NAME("marvell-pj4", ARMV7A, FK_VFPV3, false,
++             (ARM::AEK_DSP | ARM::AEK_HWDIVTHUMB | ARM::AEK_IWMMXT2))
+ // Invalid CPU
+ ARM_CPU_NAME("invalid", INVALID, FK_INVALID, true, ARM::AEK_INVALID)
+ #undef ARM_CPU_NAME
+diff --git a/lib/Support/Host.cpp b/lib/Support/Host.cpp
+index 3dc67ad..1bad1e7 100644
+--- a/lib/Support/Host.cpp
++++ b/lib/Support/Host.cpp
+@@ -247,6 +247,19 @@ StringRef sys::detail::getHostCPUNameForARM(
+     }
+   }
+ 
++  if (Implementer == "0x56") { // Marvell Technology Group Ltd.
++    // Look for the CPU part line.
++    for (unsigned I = 0, E = Lines.size(); I != E; ++I)
++      if (Lines[I].startswith("CPU part"))
++        // The CPU part is a 3 digit hexadecimal number with a 0x prefix. The
++        // values correspond to the "Part number" in the CP15/c0 register. The
++        // contents are specified in the various processor manuals.
++        return StringSwitch<const char *>(Lines[I].substr(8).ltrim("\t :"))
++            .Case("0x581", "marvell-pj4") // Sheeva PJ4 / PJ4B
++            .Case("0x584", "marvell-pj4") // Sheeva PJ4B-MP / PJ4C
++            .Default("generic");
++  }
++
+   return "generic";
+ }
+ 
+diff --git a/unittests/Support/Host.cpp b/unittests/Support/Host.cpp
+index 736b04c..12d7df0 100644
+--- a/unittests/Support/Host.cpp
++++ b/unittests/Support/Host.cpp
+@@ -92,6 +92,12 @@ Serial          : 0000000000000000
+   EXPECT_EQ(sys::detail::getHostCPUNameForARM("CPU implementer : 0x51\n"
+                                               "CPU part        : 0x06f"),
+             "krait");
++  EXPECT_EQ(sys::detail::getHostCPUNameForARM("CPU implementer : 0x56\n"
++                                              "CPU part        : 0x581"),
++            "marvell-pj4");
++  EXPECT_EQ(sys::detail::getHostCPUNameForARM("CPU implementer : 0x56\n"
++                                              "CPU part        : 0x584"),
++            "marvell-pj4");
+ }
+ 
+ TEST(getLinuxHostCPUName, AArch64) {
+diff --git a/unittests/Support/TargetParserTest.cpp b/unittests/Support/TargetParserTest.cpp
+index 48fffca..14f33cf 100644
+--- a/unittests/Support/TargetParserTest.cpp
++++ b/unittests/Support/TargetParserTest.cpp
+@@ -276,6 +276,9 @@ TEST(TargetParserTest, testARMCPU) {
+   EXPECT_TRUE(testARMCPU("swift", "armv7s", "neon-vfpv4",
+                          ARM::AEK_HWDIVARM | ARM::AEK_HWDIVTHUMB | ARM::AEK_DSP,
+                          "7-S"));
++  EXPECT_TRUE(testARMCPU("marvell-pj4", "armv7-a", "vfpv3",
++                         ARM::AEK_DSP | ARM::AEK_IWMMXT2 | ARM::AEK_HWDIVTHUMB,
++                         "7-A"));
+ }
+ 
+ TEST(TargetParserTest, testInvalidARMArch) {
